@@ -1,0 +1,97 @@
+"""Google Forms API client.
+
+Exposes a single high-level operation: create a complete form from the metadata
+and the already-built items.
+"""
+
+import logging
+
+from googleapiclient.discovery import build
+
+logger = logging.getLogger(__name__)
+
+
+def create_form(credentials, metadata, items, is_quiz=False):
+    """Create the form in the user's Drive and add the questions to it.
+
+    Takes the user's credentials, the metadata (title, description,
+    document_title) and the items already shaped for the API.
+
+    Returns a dict with the id and both URLs: the editing one and the public
+    one for responding.
+    """
+    service = build("forms", "v1", credentials=credentials)
+
+    # The API only accepts the title on creation; the description and the
+    # questions must go through batchUpdate.
+    form = service.forms().create(body={
+        "info": {
+            "title": metadata["title"],
+            "documentTitle": metadata["document_title"],
+        }
+    }).execute()
+
+    form_id = form["formId"]
+
+    if metadata.get("description"):
+        _update_description(service, form_id, metadata["description"])
+
+    _add_items(service, form_id, items, is_quiz)
+
+    return {
+        "id": form_id,
+        "edit_url": "https://docs.google.com/forms/d/" + form_id + "/edit",
+        "share_url": _share_url(service, form_id),
+    }
+
+
+def _update_description(service, form_id, description):
+    """Add the description, which cannot be set when creating the form."""
+    service.forms().batchUpdate(formId=form_id, body={
+        "requests": [{
+            "updateFormInfo": {
+                "info": {"description": description},
+                "updateMask": "description",
+            }
+        }]
+    }).execute()
+
+
+def _add_items(service, form_id, items, is_quiz):
+    """Turn on quiz mode and add the questions in ONE batchUpdate.
+
+    They have to travel together: Google rejects grading data on a question
+    while the form is not marked as a quiz yet.
+    """
+    requests = []
+
+    if is_quiz:
+        requests.append({
+            "updateSettings": {
+                "settings": {"quizSettings": {"isQuiz": True}},
+                "updateMask": "quizSettings.isQuiz",
+            }
+        })
+
+    requests.extend(items)
+
+    service.forms().batchUpdate(formId=form_id, body={"requests": requests}).execute()
+
+
+def _share_url(service, form_id):
+    """Return the public URL for responding to the form.
+
+    Google assigns the responderUri when the form is created, so it has to be
+    read back. If that read fails, the URL is assembled by hand as a fallback.
+    """
+    try:
+        form = service.forms().get(formId=form_id).execute()
+        share_url = form.get("responderUri")
+
+        if share_url:
+            return share_url
+
+    except Exception as e:
+        logger.warning("Could not read the responderUri: %s", e)
+
+    return "https://docs.google.com/forms/d/e/" + form_id + "/viewform"

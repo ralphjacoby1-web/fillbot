@@ -1,0 +1,18 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "FillBot",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/app.py",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "env": {
+                // The Windows console uses cp1252 and breaks on non-ASCII log output.
+                "PYTHONIOENCODING": "utf-8"
+            },
+            "justMyCode": false
+        }
+    ]
+}

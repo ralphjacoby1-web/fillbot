@@ -1,0 +1,46 @@
+# Compose describes how to RUN the image the Dockerfile builds. It replaces a
+# long `docker run` command with something you can read and version.
+#
+#   docker compose up --build     build and start
+#   docker compose down           stop and remove the container
+#   docker compose logs -f        follow the logs
+
+services:
+  web:
+    # Build from the Dockerfile in this directory.
+    build: .
+
+    # Fixed name, otherwise Docker generates one from the folder.
+    container_name: fillbot
+
+    # host:container. Port 5000 on your machine reaches port 5000 inside the
+    # container. Change the left number to move it: "8000:5000" would serve it
+    # on localhost:8000 without touching the app.
+    ports:
+      - "5000:5000"
+
+    # Reads .env and injects each line as an environment variable inside the
+    # container. The file is never copied into the image, so the secrets are not
+    # baked into it and rebuilding after changing a key is unnecessary.
+    env_file:
+      - .env
+
+    volumes:
+      # Persists the SQLite file on your machine. This is the path config.py
+      # already points at. Without this mount, every user and counter would
+      # vanish when the container is removed: a container's own filesystem dies
+      # with it.
+      - ./data:/app/data
+
+      # Mounts your code live, so editing a file restarts Flask's reloader
+      # instead of forcing a rebuild. Drop this line to run the code exactly as
+      # it was baked into the image.
+      - .:/app
+
+      # An empty volume masking the host's venv. Without it, the Windows
+      # virtualenv would be mounted over the container's Linux one by the line
+      # above. Nothing reads it, but this keeps the two worlds separate.
+      - /app/venv
+
+    # Restart if it crashes, but not when you stop it yourself.
+    restart: unless-stopped

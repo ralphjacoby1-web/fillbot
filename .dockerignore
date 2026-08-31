@@ -1,0 +1,24 @@
+# Everything listed here is excluded from the build context: the set of files
+# Docker copies in when running COPY. Keeping it small makes builds faster and,
+# more importantly, keeps secrets out of the image.
+
+# The virtualenv holds Windows binaries; the image installs its own Linux
+# packages from requirements.txt.
+venv/
+.venv/
+
+# Secrets. They are injected as environment variables at run time
+# (see env_file in docker-compose.yml), never baked into the image.
+.env
+
+# The database lives in a mounted volume so it survives the container.
+*.db
+data/
+
+__pycache__/
+*.py[cod]
+.git/
+.gitignore
+.vscode/
+.claude/
+README.md

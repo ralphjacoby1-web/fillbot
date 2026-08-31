@@ -1,0 +1,155 @@
+{% extends "layout.html" %}
+
+{% block title %}FillBot | Generate Google Forms Instantly with AI{% endblock %}
+{% block description %}FillBot turns a plain description into a ready-to-use Google Form in seconds. Surveys, registrations, quizzes and research forms, generated and validated automatically.{% endblock %}
+
+{% block content %}
+
+<!-- HERO -->
+<section class="hero-section d-flex align-items-center position-relative text-center text-lg-start">
+  <div class="container">
+    <div class="row align-items-center">
+      <div class="col-lg-8 mx-auto">
+
+        <p class="hero-eyebrow text-muted">NEXT GENERATION FORM AUTOMATION</p>
+
+        <h1 class="hero-title">
+          Transform ideas into
+          <span class="hero-gradient-text">intelligent forms</span>
+        </h1>
+
+        <p class="hero-subtitle text-muted">
+          FillBot uses AI to structure, validate and generate ready-to-use
+          Google Forms with precision and speed.
+        </p>
+
+        <p class="hero-micro text-muted">
+          Designed for founders, researchers, and fast-moving teams.
+        </p>
+
+        <a href="{{ url_for('generate') }}">
+          <button class="hero-action-btn mt-4">Try it out</button>
+        </a>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="hero-glow"></div>
+</section>
+
+
+<!-- HOW IT WORKS -->
+<section class="how-section container my-5 fade-up">
+  <div class="row g-4 justify-content-center">
+
+    <h2 class="hero-title text-center mb-5 fade-up">
+      <span class="hero-gradient-text">Three easy steps</span> and you're done
+    </h2>
+
+    <div class="col-lg-4 col-md-6 fade-up">
+      <div class="how-card">
+        <div class="how-number">01</div>
+        <h4 class="how-title">Describe it</h4>
+        <p class="how-text">
+          Write what the form is for, in plain language. No templates, no
+          drag and drop.
+        </p>
+      </div>
+    </div>
+
+    <div class="col-lg-4 col-md-6 fade-up">
+      <div class="how-card">
+        <div class="how-number">02</div>
+        <h4 class="how-title">FillBot builds it</h4>
+        <p class="how-text">
+          The AI writes the questions and FillBot validates every one against
+          the Google Forms rules before creating anything.
+        </p>
+      </div>
+    </div>
+
+    <div class="col-lg-4 col-md-6 fade-up">
+      <div class="how-card">
+        <div class="how-number">03</div>
+        <h4 class="how-title">Open the link</h4>
+        <p class="how-text">
+          The form lands in your own Google Drive, ready to edit or to share
+          with whoever has to fill it in.
+        </p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- ABOUT -->
+<section id="about-ai" class="how-section fade-up">
+  <div class="container">
+    <div class="row align-items-center g-4">
+
+      <div class="col-12 col-lg-6 text-center text-lg-start fade-left">
+        <h2 class="hero-title hero-gradient-text">Discover how it works</h2>
+        <p class="hero-subtitle">
+          FillBot does not just forward your prompt to a model. It normalises
+          the response, checks every question against the constraints of the
+          Google Forms API, and asks the model to correct itself when something
+          does not fit. You get a working form, not an error.
+        </p>
+        <a href="{{ url_for('generate') }}">
+          <button class="hero-action-btn mt-3">Create a form</button>
+        </a>
+      </div>
+
+      <div class="col-12 col-lg-6 fade-right">
+        <div class="how-card p-4" style="background: rgba(11,11,18,0.6); border: none;">
+          <img src="{{ url_for('static', filename='img/descargar.gif') }}"
+               alt="FillBot generating a Google Form"
+               class="img-fluid rounded shadow-lg">
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- USE CASES -->
+<section class="my-5 fade-up">
+  <div class="container text-center">
+    <p class="hero-eyebrow text-muted">Discover Use Cases</p>
+    <h2 class="hero-title hero-gradient-text">Boost your workflow effortlessly</h2>
+  </div>
+</section>
+
+<section class="mb-5 pb-5 fade-up">
+  {% for row in use_case_rows %}
+    <div class="scrolling-row {{ 'row-left' if loop.index0 % 2 == 0 else 'row-right' }} fade-up">
+      <div class="scrolling-track">
+        {% for item in row %}
+          <span class="scrolling-item">{{ item }}</span>
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+</section>
+
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+  // Reveals each section as it scrolls into view.
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add("show");
+      }
+    });
+  }, { threshold: 0.2 });
+
+  document.querySelectorAll(".fade-up, .fade-left, .fade-right, .zoom-in")
+    .forEach(el => observer.observe(el));
+</script>
+{% endblock %}
