@@ -230,6 +230,47 @@ done.
 
 ---
 
+## Tests
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+```bash
+python -m pytest
+```
+
+Or inside the container, without installing anything locally:
+
+```bash
+docker compose exec web sh -c "pip install -q pytest && python -m pytest"
+```
+
+94 tests, no network access and no API keys needed. They cover the parts where a
+mistake is expensive:
+
+- **`test_questions.py`** — every validation rule, each mirroring a constraint
+  the Google Forms API enforces. A failure here means FillBot would have shipped
+  a form Google rejects.
+- **`test_form_builder.py`** — the exact API payload for each question type,
+  including the grading block for exam mode.
+- **`test_helpers.py`** — the usage limits that keep a public deployment from
+  running up an API bill.
+- **`test_app.py`** — routes and access control: `login_required`, the OAuth
+  state check, and that the quota returns 429 *before* any token is spent.
+
+Several are regression tests for bugs that actually shipped, and they are marked
+as such in the code. The suite was verified by reintroducing three of those bugs
+and confirming it caught each one.
+
+---
+
+## License
+
+MIT. See [LICENSE](LICENSE).
+
+---
+
 ## Adding a question type
 
 1. Describe it in `QUESTION_TYPES` (`questions.py`). The prompt picks it up
