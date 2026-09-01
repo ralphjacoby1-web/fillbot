@@ -13,6 +13,8 @@ own auto-grading.
 
 A Flask app with Jinja templates, a local SQLite database and Google login.
 
+![FillBot generating an auto-graded quiz](static/img/demo.gif)
+
 ---
 
 ## What you need before running it
@@ -93,13 +95,54 @@ docker-compose.yml  how the container is run
 
 ---
 
+## Credentials
+
+Both ways of running it need this first.
+
+```bash
+cp .env.example .env
+```
+
+| Variable | Where to get it |
+|---|---|
+| `OPENAI_API_KEY` | https://platform.openai.com/api-keys |
+| `OAUTH_CLIENT_ID` | Google Cloud Console, see below |
+| `OAUTH_CLIENT_SECRET` | same |
+| `SECRET_KEY` | `python -c "import secrets; print(secrets.token_urlsafe(32))"` |
+
+If any of these is missing, the app refuses to start and names the one it needs.
+
+### Setting up Google
+
+1. In the [Google Cloud Console](https://console.cloud.google.com/), create a
+   project and enable the **Google Forms API** under *APIs & Services >
+   Library*.
+2. Under *APIs & Services > Credentials*, create an **OAuth client ID** of type
+   **Web application**. Copy the client ID and secret into `.env`.
+3. On that same client, add `http://localhost:5000/callback` under *Authorized
+   redirect URIs*. It has to match exactly, port included.
+4. Under *APIs & Services > OAuth consent screen*, add every Google account
+   that will log in to the **Test users** list.
+
+Step 4 is the one people miss. While the consent screen is in *Testing* status,
+Google only lets accounts on that list through — **including your own, even
+though you own the project**. Skipping it produces *"Access blocked: FillBot has
+not completed the Google verification process"* at login, which reads like a
+problem with the app rather than a missing entry in a list.
+
+The app requests two scopes: `forms.body` to build the form, and `drive.file`,
+which only grants access to files the app itself creates. It never sees the rest
+of your Drive.
+
+---
+
 ## Running it with Docker
 
 Docker builds a container with its own Python and its own dependencies, so
 nothing depends on what is installed on your machine. It is the shortest path
 from a fresh clone to a running app.
 
-Fill in `.env` first (see the section below), then:
+Fill in `.env` first (see above), then:
 
 ```bash
 docker compose up --build
@@ -164,34 +207,7 @@ Skipping it gets you `ModuleNotFoundError: No module named 'flask'`, because the
 system Python does not have the packages. Docker exists to make this problem go
 away.
 
-### 2. Credentials
-
-```bash
-cp .env.example .env
-```
-
-Fill in `.env`:
-
-| Variable | Where to get it |
-|---|---|
-| `OPENAI_API_KEY` | https://platform.openai.com/api-keys |
-| `OAUTH_CLIENT_ID` | Google Cloud Console, see below |
-| `OAUTH_CLIENT_SECRET` | same |
-| `SECRET_KEY` | `python -c "import secrets; print(secrets.token_urlsafe(32))"` |
-
-For the Google credentials:
-
-1. In the [Google Cloud Console](https://console.cloud.google.com/), enable the
-   **Google Forms API**.
-2. Under *APIs & Services > Credentials*, create an **OAuth client ID** of type
-   **Web application**.
-3. Add `http://localhost:5000/callback` as an *Authorized redirect URI*.
-4. On the consent screen, add your account as a test user.
-
-If a required variable is missing, the app refuses to start and tells you which
-one.
-
-### 3. Start it
+### 2. Start it
 
 ```bash
 python app.py
