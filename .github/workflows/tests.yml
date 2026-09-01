@@ -1,0 +1,42 @@
+# Runs the test suite on every push and pull request.
+#
+# The suite needs no credentials and makes no network calls: conftest.py injects
+# fake keys and a throwaway database. That is what lets this run on a clean
+# machine for free, with no secrets configured.
+
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      # Run every version even if one fails, so the log shows which ones broke
+      # rather than stopping at the first.
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          # Reuses the downloaded packages between runs.
+          cache: pip
+
+      # Installing from requirements-dev.txt on a clean machine also proves the
+      # dependency list is complete: anything missing fails here rather than on
+      # somebody else's clone.
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run tests
+        run: python -m pytest

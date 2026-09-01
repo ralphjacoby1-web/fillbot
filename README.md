@@ -1,5 +1,8 @@
 # FillBot
 
+[![tests](https://github.com/ralphjacoby1-web/FIllbot_def/actions/workflows/tests.yml/badge.svg)](https://github.com/ralphjacoby1-web/FIllbot_def/actions/workflows/tests.yml)
+[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Turns a plain-language description into a real Google Form, created directly in
 the user's own Drive.
 
@@ -262,6 +265,11 @@ mistake is expensive:
 Several are regression tests for bugs that actually shipped, and they are marked
 as such in the code. The suite was verified by reintroducing three of those bugs
 and confirming it caught each one.
+
+They also run on every push via GitHub Actions, across Python 3.10, 3.11 and
+3.12 — see [`.github/workflows/tests.yml`](.github/workflows/tests.yml).
+Installing from `requirements-dev.txt` on a clean machine is part of the job, so
+an incomplete dependency list fails there rather than on somebody else's clone.
 
 ---
 
