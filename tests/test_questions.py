@@ -168,13 +168,18 @@ def test_correct_answer_must_be_one_of_the_options():
     assert e.value.field == "correctAnswer"
 
 
-def test_trailing_whitespace_breaks_the_answer_match():
-    with pytest.raises(ValidationError):
-        questions.validate(valid(
-            type="multiple_choice",
-            options=["Paris", "London"],
-            correctAnswer="Paris ",
-        ))
+def test_trailing_whitespace_no_longer_breaks_the_answer_match():
+    """Normalisation trims both sides, so a stray space is no longer fatal.
+
+    This used to be rejected, wasting a retry on a difference the user would
+    never have seen. An answer that genuinely is not an option is still caught
+    by the test above.
+    """
+    q = valid(type="multiple_choice", options=["Paris", "London"],
+              correctAnswer="Paris ")
+    questions.validate(q)
+
+    assert q["correctAnswer"] == "Paris"
 
 
 def test_every_checkbox_answer_must_be_an_option():
@@ -206,3 +211,95 @@ def test_point_value_must_be_a_positive_integer(points):
         ))
 
     assert e.value.field == "pointValue"
+
+
+# --- newlines in displayed text ---------------------------------------------
+# Regression: the API answers 400 "Displayed text cannot contain newlines", and
+# it does so only after the form has already been created, leaving an empty
+# form behind. The model wraps long labels and options across lines, so this is
+# flattened during normalisation rather than rejected.
+
+NL = chr(10)
+CR = chr(13)
+
+
+def test_newlines_in_a_label_are_flattened():
+    q = questions.normalize({"type": "short_text", "label": "Full" + NL + "name"})
+
+    assert q["label"] == "Full name"
+
+
+def test_carriage_returns_are_flattened_too():
+    q = questions.normalize({"type": "short_text", "label": "Full" + CR + NL + "name"})
+
+    assert q["label"] == "Full name"
+
+
+def test_newlines_in_a_description_are_flattened():
+    q = questions.normalize({
+        "type": "short_text", "label": "Name",
+        "description": "First line" + NL + "second line",
+    })
+
+    assert q["description"] == "First line second line"
+
+
+def test_newlines_in_options_are_flattened():
+    q = questions.normalize({
+        "type": "multiple_choice", "label": "Pick",
+        "options": ["Deep" + NL + "red", "Blue"],
+    })
+
+    assert q["options"] == ["Deep red", "Blue"]
+
+
+def test_scale_labels_are_flattened():
+    q = questions.normalize({
+        "type": "linear_scale", "label": "Rate",
+        "startLabel": "Very" + NL + "low", "endLabel": "Very" + NL + "high",
+    })
+
+    assert q["startLabel"] == "Very low"
+    assert q["endLabel"] == "Very high"
+
+
+def test_answers_are_flattened_with_their_options():
+    """Both sides get the same treatment, so the answer still matches."""
+    q = questions.normalize({
+        "type": "multiple_choice", "label": "Capital?",
+        "options": ["Buenos" + NL + "Aires", "Lima"],
+        "correctAnswer": "Buenos" + NL + "Aires",
+    })
+    questions.validate(q)
+
+    assert q["correctAnswer"] == "Buenos Aires"
+    assert q["correctAnswer"] in q["options"]
+
+
+def test_surrounding_whitespace_is_trimmed():
+    q = questions.normalize({"type": "short_text", "label": "  Name  "})
+
+    assert q["label"] == "Name"
+
+
+def test_runs_of_spaces_collapse():
+    q = questions.normalize({"type": "short_text", "label": "Full     name"})
+
+    assert q["label"] == "Full name"
+
+
+def test_non_strings_pass_through_untouched():
+    """So validate() can still report a useful type error."""
+    assert questions.collapse_whitespace(5) == 5
+    assert questions.collapse_whitespace(None) is None
+
+
+def test_validation_still_catches_newlines_that_bypass_normalisation():
+    """The backstop, for anything built without going through normalize()."""
+    q = questions.normalize({"type": "short_text", "label": "Name"})
+    q["label"] = "Full" + NL + "name"
+
+    with pytest.raises(ValidationError) as e:
+        questions.validate(q)
+
+    assert "newline" in e.value.message.lower()

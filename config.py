@@ -16,6 +16,15 @@ BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
 
+def flag(name):
+    """Read a boolean switch from the environment.
+
+    Anything other than an explicit yes is false, so a typo turns a security
+    switch off rather than on.
+    """
+    return os.environ.get(name, "").lower() in ("1", "true", "yes")
+
+
 class ConfigError(RuntimeError):
     """Raised at startup when a required variable is missing."""
 
@@ -37,6 +46,18 @@ SECRET_KEY = os.environ.get("SECRET_KEY")
 # directory because that is what the Docker container mounts, so both ways of
 # running the app share one database.
 DATABASE = os.environ.get("DATABASE", str(BASE_DIR / "data" / "fillbot.db"))
+
+
+# --- Security -----------------------------------------------------------
+
+# Werkzeug's debugger lets anyone who can reach the port run arbitrary code
+# through the browser. It stays off unless explicitly asked for, so deploying
+# this by accident cannot hand out a shell.
+DEBUG = flag("FLASK_DEBUG")
+
+# Send the session cookie only over HTTPS. Off by default because local
+# development runs on http://localhost; turn it on wherever you deploy.
+SESSION_COOKIE_SECURE = flag("SESSION_COOKIE_SECURE")
 
 
 # --- Model ------------------------------------------------------------------

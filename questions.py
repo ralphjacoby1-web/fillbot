@@ -123,6 +123,9 @@ QUESTION_TYPES = {
 # Types built with a choiceQuestion, which therefore require options.
 CHOICE_TYPES = frozenset({"multiple_choice", "checkboxes", "dropdown"})
 
+# Characters the API rejects inside any text it will display.
+NEWLINE_CHARS = (chr(10), chr(13))
+
 # linear_scale bounds accepted by the Google Forms API.
 SCALE_LOW_VALUES = frozenset({0, 1})
 SCALE_HIGH_MIN = 2
@@ -138,25 +141,50 @@ class ValidationError(Exception):
         super().__init__(message)
 
 
+def collapse_whitespace(value):
+    """Flatten any run of whitespace into a single space.
+
+    The Google Forms API refuses displayed text containing newlines
+    ("Displayed text cannot contain newlines"), and the model does sometimes
+    wrap a long label or option across lines. A line break there is a
+    formatting artefact rather than a meaning, so it is flattened instead of
+    rejected: rejecting would burn a retry to fix something trivial.
+
+    Non-string values pass through untouched, so validate() can still complain
+    about them with a useful message.
+    """
+    if not isinstance(value, str):
+        return value
+
+    return " ".join(value.split())
+
+
 def normalize(raw):
     """Bring the model's raw JSON into a predictable shape.
 
     Always leaves the same keys present, set to None when they were absent, so
-    the rest of the code never has to ask whether they exist.
+    the rest of the code never has to ask whether they exist. Text that Google
+    will display is flattened onto a single line here.
     """
+    options = raw.get("options")
+    correct_answers = raw.get("correctAnswers")
+
     return {
         "type": raw.get("type"),
-        "label": raw.get("label"),
+        "label": collapse_whitespace(raw.get("label")),
         "required": raw.get("required", False),
-        "description": raw.get("description"),
-        "options": raw.get("options"),
+        "description": collapse_whitespace(raw.get("description")),
+        # Options and answers are flattened with the same rule, so an answer
+        # still matches its option verbatim afterwards.
+        "options": [collapse_whitespace(o) for o in options] if options else options,
         "shuffle": raw.get("shuffle"),
         "minValue": raw.get("minValue"),
         "maxValue": raw.get("maxValue"),
-        "startLabel": raw.get("startLabel"),
-        "endLabel": raw.get("endLabel"),
-        "correctAnswer": raw.get("correctAnswer"),
-        "correctAnswers": raw.get("correctAnswers"),
+        "startLabel": collapse_whitespace(raw.get("startLabel")),
+        "endLabel": collapse_whitespace(raw.get("endLabel")),
+        "correctAnswer": collapse_whitespace(raw.get("correctAnswer")),
+        "correctAnswers": ([collapse_whitespace(a) for a in correct_answers]
+                           if correct_answers else correct_answers),
         "pointValue": raw.get("pointValue"),
     }
 
@@ -184,6 +212,7 @@ def validate(q):
     """
     _validate_type(q)
     _validate_label(q)
+    _validate_no_newlines(q)
 
     if q["type"] in CHOICE_TYPES:
         _validate_options(q)
@@ -209,6 +238,27 @@ def _validate_type(q):
 def _validate_label(q):
     if not q.get("label") or not str(q["label"]).strip():
         raise ValidationError("Missing required field 'label'", field="label")
+
+
+def _validate_no_newlines(q):
+    """Backstop for the API rule that displayed text cannot contain newlines.
+
+    normalize() already flattens these fields, so reaching this error means
+    something bypassed normalisation. Catching it here still beats a 400 from
+    Google, which arrives only after the form has been created.
+    """
+    displayed = [q.get("label"), q.get("description"),
+                 q.get("startLabel"), q.get("endLabel")]
+    displayed.extend(q.get("options") or [])
+    displayed.extend(q.get("correctAnswers") or [])
+    displayed.append(q.get("correctAnswer"))
+
+    for text in displayed:
+        if isinstance(text, str) and any(c in text for c in NEWLINE_CHARS):
+            raise ValidationError(
+                "Displayed text cannot contain newlines: " + repr(text),
+                field="label",
+            )
 
 
 def _validate_options(q):

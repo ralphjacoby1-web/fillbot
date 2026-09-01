@@ -33,16 +33,41 @@ def create_form(credentials, metadata, items, is_quiz=False):
 
     form_id = form["formId"]
 
-    if metadata.get("description"):
-        _update_description(service, form_id, metadata["description"])
+    # From here on the form exists in the user's Drive. If Google rejects
+    # anything that follows, the half-built form is deleted rather than left
+    # behind: the user asked for a form, not for an empty one they have to
+    # clean up themselves.
+    try:
+        if metadata.get("description"):
+            _update_description(service, form_id, metadata["description"])
 
-    _add_items(service, form_id, items, is_quiz)
+        _add_items(service, form_id, items, is_quiz)
+    except Exception:
+        _discard(credentials, form_id)
+        raise
 
     return {
         "id": form_id,
         "edit_url": "https://docs.google.com/forms/d/" + form_id + "/edit",
         "share_url": _share_url(service, form_id),
     }
+
+
+def _discard(credentials, form_id):
+    """Delete a form that could not be finished.
+
+    The Forms API has no delete, so it goes through Drive. The drive.file scope
+    covers files this app created, which is exactly what this is.
+
+    Best effort: a failure here is logged and swallowed, so it never replaces
+    the original error that caused the rollback.
+    """
+    try:
+        drive = build("drive", "v3", credentials=credentials)
+        drive.files().delete(fileId=form_id).execute()
+        logger.info("Discarded incomplete form %s", form_id)
+    except Exception as e:
+        logger.warning("Could not discard incomplete form %s: %s", form_id, e)
 
 
 def _update_description(service, form_id, description):

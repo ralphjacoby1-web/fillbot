@@ -14,6 +14,7 @@ from openai import OpenAI
 import config
 import form_builder
 import prompts
+import questions
 
 logger = logging.getLogger(__name__)
 
@@ -122,8 +123,12 @@ def generate_metadata(user_request):
 
 
 def _clean(value):
-    """Normalise a metadata field: trim whitespace and stray quotes."""
+    """Normalise a metadata field: flatten whitespace and drop stray quotes.
+
+    The title, description and file name are displayed text too, and the API
+    rejects newlines in any of them.
+    """
     if not isinstance(value, str):
         return ""
 
-    return value.strip().strip('"').strip()
+    return questions.collapse_whitespace(value.strip().strip('"'))

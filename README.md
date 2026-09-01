@@ -59,8 +59,9 @@ google_forms.py     creates the form in the user's Drive
 ```
 
 The order is the point: **the questions are generated and validated before
-anything touches Google**. If the model fails, the user is not left with an
-empty form in their Drive.
+anything touches Google**. If the model fails, nothing was created yet. And if
+Google rejects a request anyway, the half-built form is deleted rather than
+left behind, so a failure never costs the user an empty form in their Drive.
 
 `QUESTION_TYPES`, in `questions.py`, is the single source of truth: both the
 prompt the model receives and the validation rules come out of that dictionary.
@@ -221,6 +222,30 @@ rm data/fillbot.db
 
 ---
 
+## If you deploy it
+
+Everything below is off by default so that running it locally is friction-free,
+and so that deploying it by accident cannot hand out anything dangerous. Turn
+these on wherever it is reachable by someone else:
+
+- **`FLASK_DEBUG` must stay off.** Werkzeug's debugger executes arbitrary code
+  from the browser. `docker-compose.yml` enables it for local development only;
+  the image itself defaults to off.
+- **`SESSION_COOKIE_SECURE=1`**, so the session cookie is only ever sent over
+  HTTPS.
+- **Use a real WSGI server.** `python app.py` runs Flask's development server,
+  which is single-threaded and not built for exposure. `gunicorn` is already in
+  `requirements.txt`:
+
+```bash
+gunicorn --bind :5000 --workers 1 --threads 8 --timeout 0 app:app
+```
+
+`--timeout 0` matters: generating a form chains several model and API calls, and
+gunicorn's 30-second default would kill the worker mid-request.
+
+---
+
 ## Usage limits
 
 They exist to cap API spending when the app is publicly reachable, not to sell
@@ -249,7 +274,7 @@ Or inside the container, without installing anything locally:
 docker compose exec web sh -c "pip install -q pytest && python -m pytest"
 ```
 
-94 tests, no network access and no API keys needed. They cover the parts where a
+113 tests, no network access and no API keys needed. They cover the parts where a
 mistake is expensive:
 
 - **`test_questions.py`** — every validation rule, each mirroring a constraint
@@ -261,6 +286,8 @@ mistake is expensive:
   running up an API bill.
 - **`test_app.py`** — routes and access control: `login_required`, the OAuth
   state check, and that the quota returns 429 *before* any token is spent.
+- **`test_google_forms.py`** — the request shapes sent to Google, against a
+  stubbed client, including the rollback when a request is rejected.
 
 Several are regression tests for bugs that actually shipped, and they are marked
 as such in the code. The suite was verified by reintroducing three of those bugs

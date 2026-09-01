@@ -25,6 +25,13 @@ services:
     env_file:
       - .env
 
+    environment:
+      # Live reload and tracebacks, for local development only. The image
+      # itself defaults to debug off: the Werkzeug debugger is a remote shell
+      # for anyone who can reach the port, so it must never be on in a
+      # deployment.
+      FLASK_DEBUG: "1"
+
     volumes:
       # Persists the SQLite file on your machine. This is the path config.py
       # already points at. Without this mount, every user and counter would

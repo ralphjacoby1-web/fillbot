@@ -4,6 +4,8 @@ None of these reach OpenAI or Google: they cover the guards that run before any
 external call, which is where a mistake silently exposes an endpoint.
 """
 
+import pytest
+
 import config
 import db
 import helpers
@@ -162,3 +164,58 @@ def test_the_nav_reflects_the_session(client, logged_in):
     logged_client, _ = logged_in
 
     assert b"Log out" in logged_client.get("/generate").data
+
+
+# --- security defaults ------------------------------------------------------
+# These are defaults rather than behaviour, so they are easy to flip back by
+# accident. Pinning them means a change has to be deliberate.
+
+@pytest.mark.parametrize("value,enabled", [
+    (None, False),   # unset: the case that matters
+    ("", False),
+    ("0", False),
+    ("no", False),
+    ("false", False),
+    ("banana", False),  # a typo must not switch it on
+    ("1", True),
+    ("true", True),
+    ("yes", True),
+])
+def test_security_switches_default_to_off(monkeypatch, value, enabled):
+    """Werkzeug's debugger is a remote shell for anyone who reaches the port.
+
+    The Dockerfile runs app.py listening on 0.0.0.0, so a hardcoded debug=True
+    would hand out code execution to whoever could open the port. Only an
+    explicit yes turns it on; this is checked on the parser rather than on the
+    ambient environment, so it holds wherever the suite runs.
+    """
+    if value is None:
+        monkeypatch.delenv("FLASK_DEBUG", raising=False)
+    else:
+        monkeypatch.setenv("FLASK_DEBUG", value)
+
+    assert config.flag("FLASK_DEBUG") is enabled
+
+
+def test_the_session_cookie_is_hidden_from_javascript(client):
+    assert client.application.config["SESSION_COOKIE_HTTPONLY"] is True
+
+
+def test_the_session_cookie_is_not_sent_cross_site(client):
+    """Lax still allows the OAuth callback, which is a top-level GET."""
+    assert client.application.config["SESSION_COOKIE_SAMESITE"] == "Lax"
+
+
+def test_the_session_carries_only_the_user_id(logged_in):
+    """Google tokens live in the database, never in the browser."""
+    client, user_id = logged_in
+
+    with client.session_transaction() as session:
+        assert dict(session) == {"user_id": user_id}
+
+
+def test_a_tampered_session_cookie_is_rejected(client):
+    """The cookie is signed, so editing the id does not grant access."""
+    client.set_cookie("session", "eyJ1c2VyX2lkIjo5OTl9.fake.signature")
+
+    assert client.get("/generate").status_code == 302

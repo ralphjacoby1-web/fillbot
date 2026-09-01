@@ -26,6 +26,15 @@ config.validate()
 app = Flask(__name__)
 app.secret_key = config.SECRET_KEY
 
+app.config.update(
+    # The cookie carries only the user's id, but it is still what identifies
+    # the session, so it is kept away from JavaScript and from other sites.
+    SESSION_COOKIE_HTTPONLY=True,
+    # Lax still allows the OAuth callback, which arrives as a top-level GET.
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=config.SESSION_COOKIE_SECURE,
+)
+
 # Creates the database the first time. Idempotent.
 db.init_db()
 
@@ -221,5 +230,7 @@ if __name__ == "__main__":
     app.run(
         host=os.environ.get("HOST", "127.0.0.1"),
         port=int(os.environ.get("PORT", 5000)),
-        debug=True,
+        # Off unless FLASK_DEBUG says otherwise: the debugger is a remote shell
+        # for anyone who can reach the port.
+        debug=config.DEBUG,
     )
